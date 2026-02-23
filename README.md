@@ -1,4 +1,4 @@
-- 👋 Hi, I’m @MagsPunk
+- 👋 Hi, I’m 
 - 👀 I’m interested in robotics
 - 🌱 I’m currently learning mecatronics
 - 💞️ I’m looking to collaborate on sumo bots
