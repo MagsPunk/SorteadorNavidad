@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#13392f">
+  <meta name="description" content="Descubre de forma privada tu intercambio navideño.">
+  <title>El secreto de Navidad · Intercambio familiar</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/client.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar" aria-label="Cabecera">
+      <span class="brand"><span aria-hidden="true">✦</span> LA NAVIDAD NOS UNE</span>
+      <span class="year">INTERCAMBIO · 2026</span>
+    </header>
+
+    <section class="hero">
+      <span class="tiny-label">UNA SORPRESA SOLO PARA TI</span>
+      <div class="ornament" aria-hidden="true">✧ <span>❄</span> ✧</div>
+      <h1>El secreto<br><em>de Navidad</em></h1>
+      <p>Una familia, cinco sorpresas y un secreto por descubrir. Solo tú puedes conocer a quién le regalarás.</p>
+      <div class="evergreen" aria-hidden="true"><span>✶</span></div>
+    </section>
+
+    <section class="panel" id="login-section" aria-labelledby="login-title">
+      <div class="panel-heading">
+        <span class="icon-bubble" aria-hidden="true">🎁</span>
+        <div><h2 id="login-title">Descubre tu persona</h2><p>Ingresa con tus datos individuales.</p></div>
+      </div>
+      <div id="notice" class="notice" role="status" aria-live="polite">Conectando con el sorteo seguro…</div>
+      <form id="login-form" hidden>
+        <label for="participant">¿Quién eres?</label>
+        <select id="participant" name="participant" required><option value="">Selecciona tu nombre</option></select>
+        <label for="password">Tu contraseña personal</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required placeholder="Escribe tu contraseña">
+        <button id="login-button" class="primary" type="submit">Abrir mi regalo secreto <span aria-hidden="true">↗</span></button>
+      </form>
+    </section>
+
+    <section class="panel reveal-panel" id="reveal-section" aria-labelledby="reveal-title" hidden>
+      <div class="panel-heading">
+        <span class="icon-bubble" aria-hidden="true">🔐</span>
+        <div><h2 id="reveal-title">¡Bienvenido, <span id="user-name"></span>!</h2><p>Tu resultado es personal y confidencial.</p></div>
+      </div>
+      <div id="sealed" class="sealed">
+        <div class="envelope" aria-hidden="true">✉</div>
+        <p>Tu sorpresa sigue cerrada.</p>
+        <button class="primary" id="reveal-button" type="button">Revelar mi destinatario</button>
+      </div>
+      <div id="revealed" class="revealed" hidden>
+        <span class="tiny-label">ESTA NAVIDAD LE REGALARÁS A</span>
+        <p id="recipient-name" class="recipient"></p>
+        <p class="secret-hint">🤫 ¡Guarda el secreto! No muestres esta pantalla a los demás.</p>
+        <button type="button" class="secondary" id="hide-button">Ocultar resultado</button>
+      </div>
+      <button type="button" class="text-button" id="logout-button">Cerrar sesión</button>
+      <div id="reveal-notice" class="notice" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <footer><span>✦</span> HECHO PARA COMPARTIR LA MAGIA, NO LOS SECRETOS <span>✦</span></footer>
+  </main>
+</body>
+</html>

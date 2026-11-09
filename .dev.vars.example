@@ -1,0 +1,7 @@
+# Copiar a .dev.vars SOLO para desarrollo local. Nunca subir secretos a GitHub.
+# ADMIN_TOKEN: una contraseña aleatoria de >= 24 caracteres
+ADMIN_TOKEN="CAMBIAR_TOKEN_ADMIN_LARGO_Y_ALEATORIO"
+# SESSION_SECRET: cadena aleatoria de >= 32 caracteres
+SESSION_SECRET="CAMBIAR_SECRETO_SESIONES_LARGO_Y_ALEATORIO"
+# ENCRYPTION_KEY: base64 de exactamente 32 bytes aleatorios
+ENCRYPTION_KEY="CAMBIAR_CLAVE_BASE64_DE_32_BYTES"

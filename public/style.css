@@ -1,0 +1,68 @@
+:root {
+  --forest: #153d32;
+  --deep: #09291f;
+  --gold: #d5b577;
+  --white: #fffdf7;
+  --cream: #f2eee3;
+  --soft: #e7e8dc;
+  --ink: #1f332a;
+  --muted: #66756b;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--deep);
+}
+*,*::before,*::after {box-sizing:border-box}
+[hidden] {display:none!important}
+body {margin:0; min-height:100vh; background: radial-gradient(circle at 18% 12%,#336249 0,transparent 31%),radial-gradient(circle at 87% 87%,#23503d 0,transparent 35%),var(--deep); padding:24px 18px;}
+.shell {max-width:870px; margin:0 auto; padding:0 0 22px;}
+.topbar {display:flex; justify-content:space-between; align-items:center; gap:12px; color:#e9dfca; padding:11px 0; letter-spacing:.15em; font-size:11px; font-weight:700;}
+.brand span {color:var(--gold); margin-right:8px; font-size:20px}
+.year,.link-light {color:#d0c9aa}
+.link-light {text-decoration:underline; text-underline-offset:4px}
+.hero {text-align:center; padding:43px 20px 27px; color:#fdf9ee; position:relative;}
+.tiny-label {display:block; color:var(--gold); font-size:11px; font-weight:800; letter-spacing:.23em;}
+.ornament {margin:15px 0 0; color:var(--gold); font-size:22px; letter-spacing:16px;}
+.ornament span {font-size:33px; vertical-align:middle;}
+h1 {font-family:Georgia,"Times New Roman",serif; font-weight:400; font-size:clamp(52px,9vw,84px); letter-spacing:-.065em; line-height:.97; margin:16px 0 20px;}
+h1 em {font-style:italic; color:#e2c694;}
+.hero p {max-width:520px; margin:0 auto; color:#d0dccf; font-size:15px; line-height:1.8;}
+.evergreen {height:22px; margin:28px auto 0; border-top:1px solid #5c7967; width:140px; position:relative; color:var(--gold);}
+.evergreen span {position:absolute; background:#174334; padding:0 14px; top:-13px; left:49px; font-size:20px}
+.panel {max-width:560px; margin:0 auto 18px; background:var(--white); border:1px solid #efe7d6; border-radius:19px; padding:clamp(24px,5vw,36px); box-shadow:0 18px 44px #0003;}
+.panel-heading {display:flex; gap:15px; align-items:center; margin-bottom:25px;}
+.icon-bubble {display:grid; place-items:center; background:#eaf0e7; width:52px; height:52px; flex-shrink:0; border-radius:16px; font-size:26px;}
+h2 {margin:0 0 4px; font-family:Georgia,serif; font-size:25px; font-weight:500;}
+.panel-heading p {font-size:13px; color:var(--muted); margin:0;}
+label {display:block; font-size:13px; font-weight:750; margin:16px 0 8px;}
+select,input {background:white; color:var(--ink); font:inherit; font-size:15px; width:100%; border:1px solid #c4cec4; border-radius:10px; padding:14px 15px; min-height:49px;}
+select:focus,input:focus,button:focus-visible {outline:3px solid #ba9a5e; outline-offset:3px;}
+button {font:inherit; font-weight:750; cursor:pointer; border-radius:10px; min-height:49px; padding:12px 18px; transition:filter .2s ease,transform .2s ease;}
+button:not(:disabled):hover {filter:brightness(1.11); transform:translateY(-1px);}
+button:disabled {cursor:not-allowed; opacity:.48}
+.primary {background:var(--forest); color:#fffdf7; border:1px solid var(--forest); width:100%; margin-top:22px;}
+.primary span {margin-left:10px; color:var(--gold)}
+.secondary {background:white; color:var(--forest); border:1px solid #aabdaf; width:100%;}
+.text-button {border:0; background:none; color:var(--muted); display:block; margin:20px auto 0; min-height:30px; text-decoration:underline; text-underline-offset:4px;}
+.notice {background:#eef3ec; color:#2e5440; border:1px solid #d8e3d6; padding:12px 14px; margin:15px 0; border-radius:9px; font-size:13px; line-height:1.6;}
+.notice.error,.critical {background:#fff3e7; color:#854622; border-color:#f0d9bd;}
+.sealed {text-align:center; padding:18px 0 0}
+.envelope {font-family:Georgia,serif; font-size:88px; line-height:1; color:#c7ae77}
+.sealed p {color:var(--muted); margin:12px 0 0}
+.revealed {border:1px solid #e2d0a4; border-radius:14px; background:linear-gradient(135deg,#fffcf2,#f3ead5); text-align:center; padding:26px 18px;}
+.revealed .tiny-label {color:#9a7541}
+.recipient {font-family:Georgia,serif; font-size:clamp(37px,8vw,54px); color:var(--forest); margin:14px 0;}
+.secret-hint {font-size:13px; line-height:1.7; color:#72644f}
+.revealed .secondary {margin-top:14px}
+footer {color:#b6c6b6; text-align:center; font-size:10px; letter-spacing:.13em; padding:32px 10px 0; line-height:1.8}
+footer span {color:var(--gold); padding:0 8px}
+.admin-hero {padding-bottom:35px}
+.admin-hero h1 {font-size:clamp(48px,8vw,70px)}
+.admin-shell .panel {margin-bottom:18px}
+.steps {display:grid; gap:15px}
+.steps>div:not(.step-divider):not(#credentials-box) {display:flex; align-items:start; gap:14px}
+.steps strong {font-size:15px}
+.steps p {font-size:12px; margin:7px 0 0; line-height:1.6; color:var(--muted)}
+.step-no {font-family:Georgia,serif; font-size:29px; color:#b89a64}
+.step-divider {border-top:1px solid #e1e5de; margin:8px 0}
+.credentials {padding:15px; background:#ecf3e9; border-radius:9px; color:var(--deep); overflow:auto; font-size:12px; line-height:1.9; white-space:pre-wrap; word-break:break-word;}
+@media(max-width:520px){body{padding:10px 14px}.topbar{font-size:9px}.year{display:none}.hero{padding-top:42px}.ornament{margin-top:15px}.panel-heading h2{font-size:23px}}

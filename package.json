@@ -1,0 +1,16 @@
+{
+  "name": "intercambio-navidad-familiar",
+  "private": true,
+  "type": "module",
+  "version": "0.2.0",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute intercambio-navidad --local --file=./schema.sql",
+    "db:remote": "wrangler d1 execute intercambio-navidad --remote --file=./schema.sql",
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "wrangler": "^4.20.0"
+  }
+}
