@@ -9,7 +9,7 @@ El repositorio **no incluye asignaciones, contraseñas reales ni claves de cifra
 - Organizador crea contraseñas aleatorias una sola vez y las conserva fuera de GitHub.
 - El organizador puede activar el sorteo una sola vez, pero **no recibe una lista de resultados**.
 - Motor aleatorio que garantiza que nadie se regala a sí mismo y que todos reciben una vez.
-- Contraseñas guardadas como hashes PBKDF2-SHA256 de 600,000 iteraciones, con sales individuales.
+- Códigos personales aleatorios de 144 bits, verificados mediante HMAC-SHA256 con sal individual y una clave privada del servidor (no se guardan contraseñas originales). Este método depende de que los códigos sean aleatorios y largos, no permite contraseñas débiles elegidas por usuarios y evita superar el límite de CPU del plan gratuito con PBKDF2.
 - Resultados cifrados con AES-256-GCM; la clave se establece como secreto del Worker, nunca en GitHub.
 - Inicio de sesión por participante con cookie HttpOnly, Secure, SameSite=Strict y vencimiento de cuatro horas.
 - Consultar `/api/result` devuelve **solo** el resultado de la sesión iniciada.
@@ -50,6 +50,7 @@ El repositorio **no incluye asignaciones, contraseñas reales ni claves de cifra
 - Esta versión solo permite cinco usuarios ficticios y la regla básica de **no regalarse a sí mismo**. Las reglas secretas de familias, parejas u otras exclusiones se agregarán en otra etapa y se validarán en el servidor.
 - Una vez creado el sorteo, no se repite por actualizar el navegador, reiniciar el servidor ni cambiar el HTML. Para realizar otro intercambio deberá crearse otro entorno/base de datos.
 - El bloqueo de intentos es básico para una aplicación familiar, no sustituye controles avanzados de mitigación (por ejemplo, rate limiting en el perímetro de Cloudflare y registros de auditoría).
+- Antes de utilizarlo con tu familia, prueba el flujo completo sobre Workers Free; el rendimiento y la seguridad no están auditados profesionalmente.
 - **No** compartas el token administrativo ni la clave de cifrado. Si se pierde `ENCRYPTION_KEY`, los resultados cifrados no podrán recuperarse.
 - Las credenciales ficticias no son aptas para un evento real con nombres diferentes; en una siguiente versión se permitirá introducir la lista definitiva antes del sorteo.
 
