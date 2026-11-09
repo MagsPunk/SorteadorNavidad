@@ -3,7 +3,6 @@
 const DEMO_NAMES = ["Ana", "Carlos", "Sofía", "Diego", "Lucía"];
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
-const ITERATIONS = 600_000;
 const MAX_BODY = 4096;
 const SESSION_SECONDS = 4 * 60 * 60;
 
@@ -46,10 +45,13 @@ async function jsonBody(request) {
   return JSON.parse(raw);
 }
 
-async function passwordHash(password, salt, iterations = ITERATIONS) {
-  const key = await crypto.subtle.importKey("raw", encoder.encode(password), "PBKDF2", false, ["deriveBits"]);
-  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, key, 256);
-  return base64url(new Uint8Array(bits));
+// Los códigos personales se generan aleatoriamente (144 bits). No admitimos
+// contraseñas elegidas por el usuario: su alta entropía permite verificarlas
+// mediante HMAC con una clave exclusiva del servidor sin derivaciones costosas.
+async function passwordHash(password, salt, env) {
+  const input = encoder.encode(`navidad-credential:v1:${base64url(salt)}:${password}`);
+  const mac = await crypto.subtle.sign("HMAC", await hmacKey(env.SESSION_SECRET), input);
+  return base64url(new Uint8Array(mac));
 }
 
 async function hmacKey(secret) {
@@ -170,9 +172,9 @@ async function handleApi(request, env, path) {
       for (const name of DEMO_NAMES) {
         const password = base64url(randomBytes(18));
         const salt = randomBytes(16);
-        const hash = await passwordHash(password, salt);
+        const hash = await passwordHash(password, salt, env);
         created.push({ name, password });
-        statements.push(env.DB.prepare("INSERT INTO participants(name, password_salt, password_hash, iterations) VALUES (?, ?, ?, ?)").bind(name, base64url(salt), hash, ITERATIONS));
+        statements.push(env.DB.prepare("INSERT INTO participants(name, password_salt, password_hash) VALUES (?, ?, ?)").bind(name, base64url(salt), hash));
       }
       try { await env.DB.batch(statements); }
       catch { return fail("No se pudo inicializar. Comprueba el estado de la base de datos.", 409); }
@@ -204,9 +206,9 @@ async function handleApi(request, env, path) {
     const id = Number(body?.participantId);
     if (!Number.isSafeInteger(id) || id < 1 || typeof body.password !== "string" || body.password.length > 256) return fail("Datos inválidos.");
     if (!await throttle(env, request, id)) return fail("Demasiados intentos. Intenta de nuevo en 15 minutos.", 429);
-    const user = await env.DB.prepare("SELECT id, name, password_hash, password_salt, iterations FROM participants WHERE id = ?").bind(id).first();
+    const user = await env.DB.prepare("SELECT id, name, password_hash, password_salt FROM participants WHERE id = ?").bind(id).first();
     if (!user) return fail("Nombre o contraseña incorrectos.", 401);
-    const candidate = await passwordHash(body.password, fromBase64url(user.password_salt), user.iterations);
+    const candidate = await passwordHash(body.password, fromBase64url(user.password_salt), env);
     if (!fixedEqual(candidate, user.password_hash)) return fail("Nombre o contraseña incorrectos.", 401);
     const cookie = `navidad_session=${await signSession(user.id, env.SESSION_SECRET)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_SECONDS}`;
     return response({ authenticated: true, name: user.name }, 200, { "set-cookie": cookie });
