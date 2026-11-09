@@ -4,8 +4,7 @@ CREATE TABLE IF NOT EXISTS participants (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL UNIQUE,
   password_salt TEXT NOT NULL,
-  password_hash TEXT NOT NULL,
-  iterations INTEGER NOT NULL
+  password_hash TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS draws (
