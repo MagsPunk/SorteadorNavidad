@@ -152,6 +152,15 @@ async function encryptPrivateRules(value, env) {
   return `${base64url(iv)}.${base64url(new Uint8Array(cipher))}`;
 }
 
+async function decryptPrivateRules(blob, env) {
+  const [iv, ciphertext, extra] = blob.split(".");
+  if (!iv || !ciphertext || extra) throw new Error("Reglas cifradas inválidas.");
+  const raw = await crypto.subtle.decrypt({ name: "AES-GCM", iv: fromBase64url(iv) }, await aesKey(env), fromBase64url(ciphertext));
+  const data = JSON.parse(decoder.decode(raw));
+  if (!Array.isArray(data.privateExclusions)) throw new Error("Reglas cifradas inválidas.");
+  return data.privateExclusions;
+}
+
 async function ensureRulesTable(env) {
   await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_rules (id INTEGER PRIMARY KEY CHECK (id=1), rules_encrypted TEXT NOT NULL)").run();
 }
@@ -255,7 +264,6 @@ async function handleApi(request, env, path) {
       const created = [], statements = [
         env.DB.prepare("DELETE FROM assignments"),
         env.DB.prepare("DELETE FROM draws"),
-        env.DB.prepare("DELETE FROM draw_rules"),
         env.DB.prepare("DELETE FROM login_limits"),
         env.DB.prepare("DELETE FROM participants")
       ];
@@ -282,14 +290,16 @@ async function handleApi(request, env, path) {
       let body;
       try { body = await jsonBody(request); }
       catch { return fail("Solicitud inválida."); }
-      const symmetricPairs = body?.privateExclusions ?? [];
+      await ensureRulesTable(env);
+      const saved = await env.DB.prepare("SELECT rules_encrypted FROM draw_rules WHERE id = 1").first();
+      const oldPairs = saved ? await decryptPrivateRules(saved.rules_encrypted, env) : [];
+      const symmetricPairs = [...oldPairs, ...(body?.privateExclusions ?? [])];
       const pairs = drawWithRestrictions(people.results, env.DRAW_RESTRICTIONS, symmetricPairs);
       if (!pairs) return fail("No se pudo preparar un sorteo válido; revisa las reglas privadas.", 409);
-      await ensureRulesTable(env);
       const encryptedRules = await encryptPrivateRules({ privateExclusions: symmetricPairs }, env);
       const statements = [
         env.DB.prepare("INSERT INTO draws(id, created_at) VALUES (1, datetime('now'))"),
-        env.DB.prepare("INSERT INTO draw_rules(id, rules_encrypted) VALUES (1, ?)").bind(encryptedRules)
+        env.DB.prepare("INSERT INTO draw_rules(id, rules_encrypted) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET rules_encrypted=excluded.rules_encrypted").bind(encryptedRules)
       ];
       for (const [giver, receiver] of pairs) {
         statements.push(env.DB.prepare("INSERT INTO assignments(participant_id, recipient_encrypted) VALUES(?, ?)").bind(giver, await encryptRecipient(receiver, env)));
