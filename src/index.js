@@ -117,6 +117,33 @@ export function drawCircle(ids) {
   return shuffled.map((id, i) => [id, shuffled[(i + 1) % shuffled.length]]);
 }
 
+function drawWithRestrictions(people, privateRules) {
+  const ids = people.map(person => person.id);
+  const byName = new Map(people.map(person => [person.name, person.id]));
+  if (!privateRules) {
+    // Only the original fictional demo can draw without private rules.
+    return people.length === DEMO_NAMES.length && DEMO_NAMES.every(name => byName.has(name))
+      ? drawCircle(ids) : null;
+  }
+
+  let rules;
+  try { rules = JSON.parse(privateRules); }
+  catch { return null; }
+  if (!Array.isArray(rules) || !rules.length ||
+      rules.some(pair => !Array.isArray(pair) || pair.length !== 2 ||
+        pair[0] === pair[1] || !pair.every(name => byName.has(name)))) {
+    return null;
+  }
+
+  const blocked = new Set(rules.map(([giver, receiver]) => `${byName.get(giver)}:${byName.get(receiver)}`));
+  // Reject invalid circles without favoring any of the valid circles.
+  for (let attempt = 0; attempt < 128; attempt++) {
+    const pairs = drawCircle(ids);
+    if (pairs.every(([giver, receiver]) => !blocked.has(`${giver}:${receiver}`))) return pairs;
+  }
+  return null;
+}
+
 async function throttle(env, request, participantId) {
   const ip = request.headers.get("cf-connecting-ip") || "unknown";
   // Guardar únicamente una clave HMAC, nunca la IP directamente.
@@ -203,7 +230,8 @@ async function handleApi(request, env, path) {
       if (draw) return fail("El sorteo ya está cerrado y no se puede repetir.", 409);
       const people = await env.DB.prepare("SELECT id FROM participants ORDER BY id").all();
       if (people.results.length < 2) return fail("Inicializa a los participantes primero.", 409);
-      const pairs = drawCircle(people.results.map(p => p.id));
+      const pairs = drawWithRestrictions(people.results, env.DRAW_RESTRICTIONS);
+      if (!pairs) return fail("No se pudo preparar un sorteo válido con la configuración privada.", 409);
       const statements = [env.DB.prepare("INSERT INTO draws(id, created_at) VALUES (1, datetime('now'))")];
       for (const [giver, receiver] of pairs) {
         statements.push(env.DB.prepare("INSERT INTO assignments(participant_id, recipient_encrypted) VALUES(?, ?)").bind(giver, await encryptRecipient(receiver, env)));
