@@ -34,6 +34,8 @@
         <label for="participant-names">Primer nombre de cada participante, uno por línea</label>
         <textarea id="participant-names" rows="8" autocomplete="off" spellcheck="false"></textarea>
         <button id="init-button" class="secondary" type="button">Generar participantes y contraseñas</button>
+        <button id="reset-button" class="secondary" type="button" hidden>Reiniciar participantes y sorteo</button>
+        <p class="notice critical" id="reset-warning" hidden>Reiniciar elimina el sorteo y todas las contraseñas anteriores. Los resultados ya consultados dejarán de ser válidos. Generarás nuevas contraseñas para todos los participantes.</p>
         <div id="credentials-box" hidden>
           <div class="notice critical">Copia y guarda estas contraseñas en un lugar seguro. El sistema no puede recuperarlas después.</div>
           <pre id="credentials" class="credentials"></pre>
@@ -41,6 +43,9 @@
         </div>
         <div class="step-divider"></div>
         <div><span class="step-no">02</span><div><strong>Confirmar el sorteo definitivo</strong><p>Nadie se asignará a sí mismo y cada persona tendrá un destinatario único.</p></div></div>
+        <label for="private-exclusions">Reglas privadas: parejas que NO pueden regalarse entre sí</label>
+        <textarea id="private-exclusions" rows="4" autocomplete="off" spellcheck="false" placeholder="Persona A, Persona B&#10;Persona C, Persona D"></textarea>
+        <p>Escribe una pareja por línea, separando los nombres con una coma. Cada pareja se bloqueará en ambos sentidos. No se publicarán las reglas ni se mostrarán asignaciones al organizador.</p>
         <button id="draw-button" class="primary" type="button">Realizar y cerrar sorteo</button>
       </div>
     </section>
