@@ -45,7 +45,7 @@ async function jsonBody(request) {
   return JSON.parse(raw);
 }
 
-// Los códigos personales se generan aleatoriamente (144 bits). No admitimos
+// Los códigos personales se generan aleatoriamente (48 bits). No admitimos
 // contraseñas elegidas por el usuario: su alta entropía permite verificarlas
 // mediante HMAC con una clave exclusiva del servidor sin derivaciones costosas.
 async function passwordHash(password, salt, env) {
@@ -183,7 +183,7 @@ async function handleApi(request, env, path) {
       const created = [];
       const statements = [];
       for (const name of names) {
-        const password = base64url(randomBytes(18));
+        const password = base64url(randomBytes(6));
         const salt = randomBytes(16);
         const hash = await passwordHash(password, salt, env);
         created.push({ name, password });
