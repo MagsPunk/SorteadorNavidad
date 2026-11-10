@@ -228,7 +228,7 @@ async function handleApi(request, env, path) {
     if (path === "/api/admin/draw" && method === "POST") {
       const draw = await env.DB.prepare("SELECT id FROM draws WHERE id = 1").first();
       if (draw) return fail("El sorteo ya está cerrado y no se puede repetir.", 409);
-      const people = await env.DB.prepare("SELECT id FROM participants ORDER BY id").all();
+      const people = await env.DB.prepare("SELECT id, name FROM participants ORDER BY id").all();
       if (people.results.length < 2) return fail("Inicializa a los participantes primero.", 409);
       const pairs = drawWithRestrictions(people.results, env.DRAW_RESTRICTIONS);
       if (!pairs) return fail("No se pudo preparar un sorteo válido con la configuración privada.", 409);
