@@ -45,7 +45,7 @@ async function jsonBody(request) {
   return JSON.parse(raw);
 }
 
-// Los códigos personales se generan aleatoriamente (48 bits). No admitimos
+// Los códigos personales se generan aleatoriamente (144 bits). No admitimos
 // contraseñas elegidas por el usuario: su alta entropía permite verificarlas
 // mediante HMAC con una clave exclusiva del servidor sin derivaciones costosas.
 async function passwordHash(password, salt, env) {
@@ -117,31 +117,43 @@ export function drawCircle(ids) {
   return shuffled.map((id, i) => [id, shuffled[(i + 1) % shuffled.length]]);
 }
 
-function drawWithRestrictions(people, privateRules) {
+// La lista opcional guardada en Cloudflare es direccional: [["A","B"]].
+ // Las parejas agregadas desde el panel privado bloquean AMBAS direcciones.
+export function drawWithRestrictions(people, privateRules, symmetricPairs = []) {
   const ids = people.map(person => person.id);
   const byName = new Map(people.map(person => [person.name, person.id]));
-  if (!privateRules) {
-    // Only the original fictional demo can draw without private rules.
-    return people.length === DEMO_NAMES.length && DEMO_NAMES.every(name => byName.has(name))
-      ? drawCircle(ids) : null;
+  if (ids.length < 2 || byName.size !== ids.length) return null;
+  let rules = [];
+  if (privateRules) {
+    try { rules = JSON.parse(privateRules); }
+    catch { return null; }
   }
-
-  let rules;
-  try { rules = JSON.parse(privateRules); }
-  catch { return null; }
-  if (!Array.isArray(rules) || !rules.length ||
-      rules.some(pair => !Array.isArray(pair) || pair.length !== 2 ||
-        pair[0] === pair[1] || !pair.every(name => byName.has(name)))) {
-    return null;
+  if (!Array.isArray(rules) || !Array.isArray(symmetricPairs) || symmetricPairs.length > 100) return null;
+  const all = [...rules];
+  for (const pair of symmetricPairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) return null;
+    all.push(pair, [pair[1], pair[0]]);
   }
-
-  const blocked = new Set(rules.map(([giver, receiver]) => `${byName.get(giver)}:${byName.get(receiver)}`));
-  // Reject invalid circles without favoring any of the valid circles.
-  for (let attempt = 0; attempt < 128; attempt++) {
+  if (all.some(pair => !Array.isArray(pair) || pair.length !== 2 ||
+    pair[0] === pair[1] || pair.some(name => typeof name !== "string" || !byName.has(name)))) return null;
+  const blocked = new Set(all.map(([giver, receiver]) => `${byName.get(giver)}:${byName.get(receiver)}`));
+  // Muestreo por rechazo para no favorecer alguno de los círculos válidos.
+  for (let attempt = 0; attempt < 4096; attempt++) {
     const pairs = drawCircle(ids);
     if (pairs.every(([giver, receiver]) => !blocked.has(`${giver}:${receiver}`))) return pairs;
   }
   return null;
+}
+
+async function encryptPrivateRules(value, env) {
+  const iv = randomBytes(12);
+  const data = encoder.encode(JSON.stringify(value));
+  const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await aesKey(env), data);
+  return `${base64url(iv)}.${base64url(new Uint8Array(cipher))}`;
+}
+
+async function ensureRulesTable(env) {
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS draw_rules (id INTEGER PRIMARY KEY CHECK (id=1), rules_encrypted TEXT NOT NULL)").run();
 }
 
 async function throttle(env, request, participantId) {
@@ -188,7 +200,8 @@ async function handleApi(request, env, path) {
     if (path === "/api/admin/status" && method === "GET") {
       const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM participants").first();
       const draw = await env.DB.prepare("SELECT id FROM draws WHERE id = 1").first();
-      return response({ participants: count.n, initialized: count.n > 0, drawn: Boolean(draw) });
+      const people = await env.DB.prepare("SELECT name FROM participants ORDER BY id").all();
+      return response({ participants: count.n, names: people.results.map(p => p.name), initialized: count.n > 0, drawn: Boolean(draw) });
     }
 
     if (path === "/api/admin/initialize" && method === "POST") {
@@ -210,7 +223,7 @@ async function handleApi(request, env, path) {
       const created = [];
       const statements = [];
       for (const name of names) {
-        const password = base64url(randomBytes(6));
+        const password = base64url(randomBytes(18));
         const salt = randomBytes(16);
         const hash = await passwordHash(password, salt, env);
         created.push({ name, password });
@@ -225,14 +238,59 @@ async function handleApi(request, env, path) {
       return response({ message: "Guarda estas contraseñas ahora. No podrán recuperarse.", credentials: created }, 201);
     }
 
+    if (path === "/api/admin/reinitialize" && method === "POST") {
+      let body;
+      try { body = await jsonBody(request); }
+      catch { return fail("Solicitud inválida."); }
+      if (body?.confirmation !== "REHACER" || !Array.isArray(body?.names) ||
+          body.names.length < 2 || body.names.length > 50 ||
+          body.names.some(name => typeof name !== "string")) return fail("Confirmación o nombres inválidos.");
+      const names = body.names.map(name => name.normalize("NFC").trim());
+      if (names.some(name => !/^[\\p{L}][\\p{L}\\p{M}'’-]{0,39}$/u.test(name)) ||
+          new Set(names.map(name => name.toLocaleLowerCase("es"))).size !== names.length) {
+        return fail("Revisa los nombres; no pueden repetirse.");
+      }
+      // Reinicio atómico: invalida contraseñas, sesiones, resultados y sorteos anteriores.
+      // El AUTOINCREMENT de participants NO se reinicia, así que los ID de cookies viejas no se reutilizan.
+      const created = [], statements = [
+        env.DB.prepare("DELETE FROM assignments"),
+        env.DB.prepare("DELETE FROM draws"),
+        env.DB.prepare("DELETE FROM draw_rules"),
+        env.DB.prepare("DELETE FROM login_limits"),
+        env.DB.prepare("DELETE FROM participants")
+      ];
+      for (const name of names) {
+        const password = base64url(randomBytes(18));
+        const salt = randomBytes(16);
+        const hash = await passwordHash(password, salt, env);
+        created.push({ name, password });
+        statements.push(env.DB.prepare("INSERT INTO participants(name, password_salt, password_hash) VALUES (?, ?, ?)")
+          .bind(name, base64url(salt), hash));
+      }
+      await ensureRulesTable(env);
+      try { await env.DB.batch(statements); }
+      catch { return fail("No se pudo reiniciar el intercambio; la base anterior no se modificó.", 409); }
+      return response({ initialized: true, drawn: false, credentials: created,
+        message: "Participantes reiniciados. Guarda las contraseñas nuevas: las anteriores quedaron inválidas." }, 201);
+    }
+
     if (path === "/api/admin/draw" && method === "POST") {
       const draw = await env.DB.prepare("SELECT id FROM draws WHERE id = 1").first();
       if (draw) return fail("El sorteo ya está cerrado y no se puede repetir.", 409);
       const people = await env.DB.prepare("SELECT id, name FROM participants ORDER BY id").all();
       if (people.results.length < 2) return fail("Inicializa a los participantes primero.", 409);
-      const pairs = drawWithRestrictions(people.results, env.DRAW_RESTRICTIONS);
-      if (!pairs) return fail("No se pudo preparar un sorteo válido con la configuración privada.", 409);
-      const statements = [env.DB.prepare("INSERT INTO draws(id, created_at) VALUES (1, datetime('now'))")];
+      let body;
+      try { body = await jsonBody(request); }
+      catch { return fail("Solicitud inválida."); }
+      const symmetricPairs = body?.privateExclusions ?? [];
+      const pairs = drawWithRestrictions(people.results, env.DRAW_RESTRICTIONS, symmetricPairs);
+      if (!pairs) return fail("No se pudo preparar un sorteo válido; revisa las reglas privadas.", 409);
+      await ensureRulesTable(env);
+      const encryptedRules = await encryptPrivateRules({ privateExclusions: symmetricPairs }, env);
+      const statements = [
+        env.DB.prepare("INSERT INTO draws(id, created_at) VALUES (1, datetime('now'))"),
+        env.DB.prepare("INSERT INTO draw_rules(id, rules_encrypted) VALUES (1, ?)").bind(encryptedRules)
+      ];
       for (const [giver, receiver] of pairs) {
         statements.push(env.DB.prepare("INSERT INTO assignments(participant_id, recipient_encrypted) VALUES(?, ?)").bind(giver, await encryptRecipient(receiver, env)));
       }
