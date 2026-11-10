@@ -47,6 +47,15 @@
         <textarea id="private-exclusions" rows="4" autocomplete="off" spellcheck="false" placeholder="Persona A, Persona B&#10;Persona C, Persona D"></textarea>
         <p>Escribe una pareja por línea, separando los nombres con una coma. Cada pareja se bloqueará en ambos sentidos. No se publicarán las reglas ni se mostrarán asignaciones al organizador.</p>
         <button id="draw-button" class="primary" type="button">Realizar y cerrar sorteo</button>
+        <div id="closed-draw-actions" hidden>
+          <div class="step-divider"></div>
+          <label for="remove-participant">Participante que se dará de baja</label>
+          <select id="remove-participant"></select>
+          <button id="check-removal" class="secondary" type="button">Comprobar baja privada</button>
+          <p id="removal-status" role="status" aria-live="polite"></p>
+          <button id="apply-removal" class="secondary" type="button" hidden>Dar de baja y cambiar una asignación</button>
+          <button id="redraw-remaining" class="secondary" type="button" hidden>Dar de baja y volver a sortear conservando contraseñas</button>
+        </div>
       </div>
     </section>
     <footer>Las contraseñas se almacenan como hashes. Las asignaciones se guardan cifradas en la base de datos, no en GitHub.</footer>

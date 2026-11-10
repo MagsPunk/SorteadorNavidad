@@ -119,7 +119,7 @@ export function drawCircle(ids) {
 
 // La lista opcional guardada en Cloudflare es direccional: [["A","B"]].
  // Las parejas agregadas desde el panel privado bloquean AMBAS direcciones.
-export function drawWithRestrictions(people, privateRules, symmetricPairs = []) {
+function blockedAssignments(people, privateRules, symmetricPairs, ignoreInactive) {
   const ids = people.map(person => person.id);
   const byName = new Map(people.map(person => [person.name, person.id]));
   if (ids.length < 2 || byName.size !== ids.length) return null;
@@ -135,8 +135,16 @@ export function drawWithRestrictions(people, privateRules, symmetricPairs = []) 
     all.push(pair, [pair[1], pair[0]]);
   }
   if (all.some(pair => !Array.isArray(pair) || pair.length !== 2 ||
-    pair[0] === pair[1] || pair.some(name => typeof name !== "string" || !byName.has(name)))) return null;
-  const blocked = new Set(all.map(([giver, receiver]) => `${byName.get(giver)}:${byName.get(receiver)}`));
+    pair[0] === pair[1] || pair.some(name => typeof name !== "string"))) return null;
+  const active = ignoreInactive ? all.filter(pair => pair.every(name => byName.has(name))) : all;
+  if (active.some(pair => pair.some(name => !byName.has(name)))) return null;
+  return new Set(active.map(([giver, receiver]) => `${byName.get(giver)}:${byName.get(receiver)}`));
+}
+
+export function drawWithRestrictions(people, privateRules, symmetricPairs = [], ignoreInactive = false) {
+  const blocked = blockedAssignments(people, privateRules, symmetricPairs, ignoreInactive);
+  if (!blocked) return null;
+  const ids = people.map(person => person.id);
   // Muestreo por rechazo para no favorecer alguno de los círculos válidos.
   for (let attempt = 0; attempt < 4096; attempt++) {
     const pairs = drawCircle(ids);
@@ -159,6 +167,91 @@ async function decryptPrivateRules(blob, env) {
   const data = JSON.parse(decoder.decode(raw));
   if (!Array.isArray(data.privateExclusions)) throw new Error("Reglas cifradas inválidas.");
   return data.privateExclusions;
+}
+
+
+async function changeClosedDraw(request, env) {
+  let body;
+  try { body = await jsonBody(request); }
+  catch { return fail("Solicitud inválida."); }
+  const { name, mode } = body ?? {};
+  if (typeof name !== "string" || !["check", "remove", "redraw"].includes(mode)) {
+    return fail("Elige un participante y una operación válida.");
+  }
+
+  const [draw, roster, assignments, rules] = await env.DB.batch([
+    env.DB.prepare("SELECT id FROM draws WHERE id = 1"),
+    env.DB.prepare("SELECT id, name FROM participants ORDER BY id"),
+    env.DB.prepare("SELECT participant_id, recipient_encrypted FROM assignments ORDER BY participant_id"),
+    env.DB.prepare("SELECT rules_encrypted FROM draw_rules WHERE id = 1")
+  ]);
+  const people = roster.results;
+  const removed = people.find(person => person.name === name);
+  if (!draw.results.length || !removed || people.length < 3) {
+    return fail("Se requiere un sorteo cerrado y al menos dos participantes después de la baja.", 409);
+  }
+  const encrypted = rules.results[0]?.rules_encrypted;
+  if (!encrypted) return fail("Faltan las reglas privadas del sorteo vigente.", 409);
+  const privatePairs = await decryptPrivateRules(encrypted, env);
+  const remaining = people.filter(person => person.id !== removed.id);
+  const blocked = blockedAssignments(remaining, env.DRAW_RESTRICTIONS, privatePairs, true);
+  if (!blocked) return fail("No se pudieron validar las reglas del sorteo vigente.", 409);
+
+  const current = new Map(await Promise.all(assignments.results.map(async row => [
+    row.participant_id, await decryptRecipient(row.recipient_encrypted, env)
+  ])));
+  const participantIds = new Set(people.map(person => person.id));
+  const visited = new Set();
+  let cursor = removed.id;
+  while (participantIds.has(cursor) && !visited.has(cursor)) {
+    visited.add(cursor);
+    cursor = current.get(cursor);
+  }
+  if (current.size !== people.length || visited.size !== people.length || cursor !== removed.id) {
+    return fail("No se pudo verificar el círculo de asignaciones vigente.", 409);
+  }
+
+  const previousGiver = [...current].find(([, receiver]) => receiver === removed.id)[0];
+  const direct = remaining.map(({ id }) => [id, current.get(id === previousGiver ? removed.id : id)]);
+  const canRemoveDirectly = direct.every(([giver, receiver]) => !blocked.has(`${giver}:${receiver}`));
+  if (mode === "check") return response({ canRemoveDirectly });
+  if (canRemoveDirectly !== (mode === "remove")) {
+    return fail("La opción elegida ya no corresponde al estado vigente. Comprueba la baja de nuevo.", 409);
+  }
+  const replacement = canRemoveDirectly
+    ? direct.filter(([giver]) => giver === previousGiver)
+    : drawWithRestrictions(remaining, env.DRAW_RESTRICTIONS, privatePairs, true);
+  if (!replacement) return fail("No se encontró un sorteo que respete todas las reglas.", 409);
+
+  // Abortar el lote si el sorteo cambió después de leerlo. Si hay divergencia,
+  // el INSERT incumple el CHECK de draws y revierte todo el lote.
+  const snapshot = JSON.stringify(assignments.results.map(row => [row.participant_id, row.recipient_encrypted]));
+  const guard = env.DB.prepare(`
+    INSERT INTO draws(id, created_at)
+    SELECT 0, datetime('now')
+    WHERE NOT EXISTS (SELECT 1 FROM draws WHERE id = 1)
+       OR (SELECT COUNT(*) FROM participants) != ?
+       OR (SELECT COUNT(*) FROM assignments) != ?
+       OR NOT EXISTS (SELECT 1 FROM draw_rules WHERE id = 1 AND rules_encrypted = ?)
+       OR EXISTS (
+         SELECT 1 FROM json_each(?) AS expected
+         WHERE NOT EXISTS (
+           SELECT 1 FROM assignments
+           WHERE participant_id = json_extract(expected.value, '$[0]')
+             AND recipient_encrypted = json_extract(expected.value, '$[1]')
+         )
+       )
+  `).bind(people.length, current.size, encrypted, snapshot);
+  const statements = [guard];
+  for (const [giver, receiver] of replacement) {
+    statements.push(env.DB.prepare("UPDATE assignments SET recipient_encrypted = ? WHERE participant_id = ?")
+      .bind(await encryptRecipient(receiver, env), giver));
+  }
+  statements.push(env.DB.prepare("DELETE FROM assignments WHERE participant_id = ?").bind(removed.id));
+  statements.push(env.DB.prepare("DELETE FROM participants WHERE id = ?").bind(removed.id));
+  try { await env.DB.batch(statements); }
+  catch { return fail("No se aplicó la baja. Comprueba otra vez el estado vigente.", 409); }
+  return response({ total: remaining.length, drawn: true });
 }
 
 async function ensureRulesTable(env) {
@@ -245,6 +338,10 @@ async function handleApi(request, env, path) {
       try { await env.DB.batch(statements); }
       catch { return fail("No se pudo inicializar. Comprueba el estado de la base de datos.", 409); }
       return response({ message: "Guarda estas contraseñas ahora. No podrán recuperarse.", credentials: created }, 201);
+    }
+
+    if (path === "/api/admin/change-closed-draw" && method === "POST") {
+      return changeClosedDraw(request, env);
     }
 
     if (path === "/api/admin/reinitialize" && method === "POST") {

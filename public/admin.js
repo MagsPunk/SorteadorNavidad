@@ -42,6 +42,11 @@ async function refresh() {
   $("reset-warning").hidden = !status.initialized;
   $("reset-button").disabled = !status.initialized;
   $("draw-button").disabled = !status.initialized || status.drawn;
+  const selector = $("remove-participant");
+  $("closed-draw-actions").hidden = !status.drawn || status.participants < 3;
+  selector.replaceChildren(new Option("Selecciona un participante", ""));
+  for (const name of status.names ?? []) selector.add(new Option(name, name));
+  clearRemovalCheck();
   if (!namesDirty && Array.isArray(status.names) && status.names.length) {
     const existing = [...status.names];
     // Si ya hay 16 nombres, completar la lista para el nuevo sorteo de 18.
@@ -140,3 +145,47 @@ $("draw-button").addEventListener("click", async () => {
     await refresh();
   } catch(err) { message(err.message, true); await refresh(); }
 });
+
+function clearRemovalCheck() {
+  $("removal-status").textContent = "";
+  $("apply-removal").hidden = true;
+  $("redraw-remaining").hidden = true;
+}
+
+$("remove-participant").addEventListener("change", clearRemovalCheck);
+for (const [buttonId, mode] of [
+  ["check-removal", "check"], ["apply-removal", "remove"], ["redraw-remaining", "redraw"]
+]) {
+  $(buttonId).addEventListener("click", async () => {
+    const name = $("remove-participant").value;
+    clearRemovalCheck();
+    if (!name) {
+      $("removal-status").textContent = "Elige a quién dar de baja.";
+      return;
+    }
+    $("remove-participant").disabled = true;
+    $("check-removal").disabled = true;
+    try {
+      const data = await api("/api/admin/change-closed-draw", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, mode })
+      });
+      if (mode === "check") {
+        $("removal-status").textContent = data.canRemoveDirectly
+          ? `Se puede dar de baja a ${name} cambiando un solo destinatario y conservando las demás contraseñas.`
+          : `Dar de baja a ${name} con un solo cambio rompería una regla. Resortear puede cambiar los resultados ya consultados. Las demás contraseñas seguirán vigentes.`;
+        $(data.canRemoveDirectly ? "apply-removal" : "redraw-remaining").hidden = false;
+      } else {
+        namesDirty = false;
+        await refresh();
+        $("removal-status").textContent = `Baja aplicada. Sorteo cerrado con ${data.total} participantes.`;
+      }
+    } catch (err) {
+      $("removal-status").textContent = err.message;
+    } finally {
+      $("remove-participant").disabled = false;
+      $("check-removal").disabled = false;
+    }
+  });
+}
