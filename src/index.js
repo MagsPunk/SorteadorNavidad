@@ -246,7 +246,7 @@ async function handleApi(request, env, path) {
           body.names.length < 2 || body.names.length > 50 ||
           body.names.some(name => typeof name !== "string")) return fail("Confirmación o nombres inválidos.");
       const names = body.names.map(name => name.normalize("NFC").trim());
-      if (names.some(name => !/^[\\p{L}][\\p{L}\\p{M}'’-]{0,39}$/u.test(name)) ||
+      if (names.some(name => !/^[\p{L}][\p{L}\p{M}'’-]{0,39}$/u.test(name)) ||
           new Set(names.map(name => name.toLocaleLowerCase("es"))).size !== names.length) {
         return fail("Revisa los nombres; no pueden repetirse.");
       }
