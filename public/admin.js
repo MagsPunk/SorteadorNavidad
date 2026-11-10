@@ -43,7 +43,14 @@ async function refresh() {
   $("reset-button").disabled = !status.initialized;
   $("draw-button").disabled = !status.initialized || status.drawn;
   if (!namesDirty && Array.isArray(status.names) && status.names.length) {
-    $("participant-names").value = status.names.join("\n");
+    const existing = [...status.names];
+    // Si ya hay 16 nombres, completar la lista para el nuevo sorteo de 18.
+    if (existing.length === 16) {
+      for (const extra of ["Mónica", "Karim"]) {
+        if (!existing.includes(extra)) existing.push(extra);
+      }
+    }
+    $("participant-names").value = existing.join("\n");
   }
 }
 
