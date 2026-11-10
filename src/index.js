@@ -167,14 +167,31 @@ async function handleApi(request, env, path) {
     if (path === "/api/admin/initialize" && method === "POST") {
       const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM participants").first();
       if (count.n > 0) return fail("El intercambio ya está inicializado.", 409);
+      let body;
+      try { body = await jsonBody(request); }
+      catch { return fail("Solicitud inválida."); }
+      const submittedNames = body?.names === undefined ? DEMO_NAMES : body.names;
+      if (!Array.isArray(submittedNames) || submittedNames.length < 2 || submittedNames.length > 50 ||
+          submittedNames.some(name => typeof name !== "string")) {
+        return fail("Ingresa entre 2 y 50 nombres.");
+      }
+      const names = submittedNames.map(name => name.normalize("NFC").trim());
+      if (names.some(name => !/^[\p{L}][\p{L}\p{M}'’-]{0,39}$/u.test(name)) ||
+          new Set(names.map(name => name.toLocaleLowerCase("es"))).size !== names.length) {
+        return fail("Escribe un primer nombre por línea, sin duplicados.");
+      }
       const created = [];
       const statements = [];
-      for (const name of DEMO_NAMES) {
+      for (const name of names) {
         const password = base64url(randomBytes(18));
         const salt = randomBytes(16);
         const hash = await passwordHash(password, salt, env);
         created.push({ name, password });
-        statements.push(env.DB.prepare("INSERT INTO participants(name, password_salt, password_hash) VALUES (?, ?, ?)").bind(name, base64url(salt), hash));
+        // The first insert checks again inside the atomic batch.
+        const sql = statements.length === 0
+          ? "INSERT INTO participants(name, password_salt, password_hash) VALUES (CASE WHEN NOT EXISTS (SELECT 1 FROM participants) THEN ? END, ?, ?)"
+          : "INSERT INTO participants(name, password_salt, password_hash) VALUES (?, ?, ?)";
+        statements.push(env.DB.prepare(sql).bind(name, base64url(salt), hash));
       }
       try { await env.DB.batch(statements); }
       catch { return fail("No se pudo inicializar. Comprueba el estado de la base de datos.", 409); }

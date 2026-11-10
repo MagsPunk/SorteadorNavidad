@@ -24,6 +24,7 @@ async function refresh() {
   $("admin-controls").hidden = false;
   $("admin-status").textContent = `${status.participants} participantes · ${status.drawn ? "Sorteo confirmado y bloqueado" : "Sorteo pendiente"}`;
   $("init-button").disabled = status.initialized;
+  $("participant-names").disabled = status.initialized;
   $("draw-button").disabled = !status.initialized || status.drawn;
 }
 
@@ -42,11 +43,16 @@ $("admin-form").addEventListener("submit", async e => {
 });
 
 $("init-button").addEventListener("click", async () => {
-  if (!confirm("¿Crear exactamente cinco participantes ficticios y sus contraseñas? Solo se podrán generar una vez.")) return;
+  const names = $("participant-names").value.split(/\r?\n/).map(name => name.trim()).filter(Boolean);
+  if (names.length < 2) {
+    message("Ingresa al menos dos nombres, uno por línea.", true);
+    return;
+  }
+  if (!confirm(`¿Registrar a ${names.length} participantes y generar sus contraseñas? Solo se podrán generar una vez.`)) return;
   $("init-button").disabled = true;
   try {
     const data = await api("/api/admin/initialize", {
-      method: "POST", headers: { "content-type": "application/json" }, body: "{}",
+      method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ names }),
     });
     savedCredentials = data.credentials.map(x => `${x.name}: ${x.password}`).join("\n");
     $("credentials").textContent = savedCredentials;

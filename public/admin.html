@@ -30,7 +30,9 @@
     <section class="panel" id="admin-controls" hidden>
       <div class="panel-heading"><span class="icon-bubble">⚙️</span><div><h2>Estado del intercambio</h2><p id="admin-status">Cargando…</p></div></div>
       <div class="steps">
-        <div><span class="step-no">01</span><div><strong>Crear cinco participantes</strong><p>Genera contraseñas aleatorias. Solo aparecen una vez, en esta pantalla.</p></div></div>
+        <div><span class="step-no">01</span><div><strong>Registrar participantes</strong><p>Genera contraseñas aleatorias. Solo aparecen una vez, en esta pantalla.</p></div></div>
+        <label for="participant-names">Primer nombre de cada participante, uno por línea</label>
+        <textarea id="participant-names" rows="8" autocomplete="off" spellcheck="false"></textarea>
         <button id="init-button" class="secondary" type="button">Generar participantes y contraseñas</button>
         <div id="credentials-box" hidden>
           <div class="notice critical">Copia y guarda estas contraseñas en un lugar seguro. El sistema no puede recuperarlas después.</div>
