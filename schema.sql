@@ -22,3 +22,8 @@ CREATE TABLE IF NOT EXISTS login_limits (
   attempts INTEGER NOT NULL,
   reset_at INTEGER NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS draw_rules (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  rules_encrypted TEXT NOT NULL
+);
